@@ -1,16 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ColorInterpretation } from '../types';
 import { colorInterpretations } from '../data/colorInterpretations';
-import { Edit3, Save, X, Plus, Trash2, Sparkles } from 'lucide-react';
+import { Edit3, Save, X, Plus, Trash2, Sparkles, LogOut, Clock } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 interface AdminPanelProps {
   onClose: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
+  const { logout, extendSession } = useAuth();
   const [editingColor, setEditingColor] = useState<string | null>(null);
   const [interpretations, setInterpretations] = useState<ColorInterpretation[]>(colorInterpretations);
   const [editForm, setEditForm] = useState<ColorInterpretation | null>(null);
+  const [sessionTimer, setSessionTimer] = useState<number>(30 * 60); // 30 minutes in seconds
+
+  useEffect(() => {
+    // Session timer countdown
+    const timer = setInterval(() => {
+      setSessionTimer(prev => {
+        if (prev <= 1) {
+          handleLogout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Extend session on activity
+    const handleActivity = () => {
+      extendSession();
+      setSessionTimer(30 * 60); // Reset to 30 minutes
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    return () => {
+      clearInterval(timer);
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+    };
+  }, [extendSession]);
+
+  const handleLogout = () => {
+    logout();
+    onClose();
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const startEditing = (interpretation: ColorInterpretation) => {
     setEditingColor(interpretation.id);
@@ -136,12 +181,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 <p className="text-teal-600 font-medium">Edit Color Interpretations</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl font-bold w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-            >
-              ×
-            </button>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 bg-teal-50 rounded-xl border border-teal-200">
+                <Clock className="w-4 h-4 text-teal-600" />
+                <span className="text-sm font-medium text-teal-700">
+                  Session: {formatTime(sessionTimer)}
+                </span>
+              </div>
+              
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+              
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-6">

@@ -2,16 +2,21 @@ import React, { useState } from 'react';
 import { ColorPalette } from './components/ColorPalette';
 import { ColorInterpretationDisplay } from './components/ColorInterpretationDisplay';
 import { AdminPanel } from './components/AdminPanel';
+import { LoginModal } from './components/LoginModal';
+import { useAuth } from './hooks/useAuth';
 import { getColorInterpretation } from './data/colorInterpretations';
 import { GameState } from './types';
 import { Palette, Settings, RotateCcw, Users, Sparkles } from 'lucide-react';
 
 function App() {
+  const { isAuthenticated, isLoading, login } = useAuth();
   const [gameState, setGameState] = useState<GameState>({
     selectedColor: null,
     showInterpretation: false,
     isAdminMode: false
   });
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginError, setLoginError] = useState<string>('');
 
   const handleColorSelect = (colorId: string) => {
     setGameState(prev => ({
@@ -36,16 +41,53 @@ function App() {
     });
   };
 
-  const toggleAdminMode = () => {
-    setGameState(prev => ({
-      ...prev,
-      isAdminMode: !prev.isAdminMode
-    }));
+  const handleAdminClick = () => {
+    if (isAuthenticated) {
+      setGameState(prev => ({
+        ...prev,
+        isAdminMode: true
+      }));
+    } else {
+      setShowLogin(true);
+      setLoginError('');
+    }
+  };
+
+  const handleLogin = (password: string) => {
+    const success = login(password);
+    if (success) {
+      setShowLogin(false);
+      setLoginError('');
+      setGameState(prev => ({
+        ...prev,
+        isAdminMode: true
+      }));
+    } else {
+      setLoginError('Invalid password. Please try again.');
+    }
+  };
+
+  const handleCloseLogin = () => {
+    setShowLogin(false);
+    setLoginError('');
   };
 
   const selectedInterpretation = gameState.selectedColor 
     ? getColorInterpretation(gameState.selectedColor)
     : null;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-emerald-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
+            <Sparkles className="w-8 h-8 text-white animate-pulse" />
+          </div>
+          <p className="text-teal-600 font-medium">Loading AURA...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-emerald-50">
@@ -76,11 +118,14 @@ function App() {
                 Reset
               </button>
               <button
-                onClick={toggleAdminMode}
+                onClick={handleAdminClick}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-xl hover:from-teal-700 hover:to-cyan-700 transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 <Settings className="w-4 h-4" />
                 Admin
+                {isAuthenticated && (
+                  <div className="w-2 h-2 bg-green-400 rounded-full" />
+                )}
               </button>
             </div>
           </div>
@@ -153,6 +198,15 @@ function App() {
         )}
       </main>
 
+      {/* Login Modal */}
+      {showLogin && (
+        <LoginModal
+          onLogin={handleLogin}
+          onClose={handleCloseLogin}
+          error={loginError}
+        />
+      )}
+
       {/* Interpretation Modal */}
       {gameState.showInterpretation && selectedInterpretation && (
         <ColorInterpretationDisplay
@@ -162,7 +216,7 @@ function App() {
       )}
 
       {/* Admin Panel */}
-      {gameState.isAdminMode && (
+      {gameState.isAdminMode && isAuthenticated && (
         <AdminPanel onClose={() => setGameState(prev => ({ ...prev, isAdminMode: false }))} />
       )}
 
